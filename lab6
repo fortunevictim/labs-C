@@ -1,0 +1,146 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+#define MAX_INT(a, b) (((a) > (b)) ? a : b)
+#define NODE_HEIGHT(vertex) ((vertex != NULL) ? vertex->n : 0)
+
+typedef struct node node;
+
+struct node {
+    node* left;
+    node* right;
+    int n;
+    int val;
+};
+
+void free_nodes ( node* cur_node) {
+    if (cur_node == NULL) {
+        return;
+    }
+    if (cur_node->left != NULL) {
+        free_nodes(cur_node->left);
+    }
+    if (cur_node->right != NULL) {
+        free_nodes(cur_node->right);
+    }
+    free(cur_node);
+} //free();
+
+void nodes_initiate ( node* cur_node, int val) { //making node
+    cur_node->val = val;
+    cur_node->left = NULL;
+    cur_node->right = NULL;
+    cur_node->n = 1;
+}
+
+void nodes_h_calc ( node* nodes) { // height of the tree
+    nodes->n = MAX_INT(NODE_HEIGHT(nodes->left), NODE_HEIGHT(nodes->right)) + 1;
+}
+
+int diff ( node* nodes) {
+    return ( NODE_HEIGHT(nodes->left) -  NODE_HEIGHT(nodes->right));
+}
+
+struct node* left_rotate ( node* a) {
+    node* b = a->right;
+    a->right = b->left;
+    b->left = a;
+    nodes_h_calc(a);
+    nodes_h_calc(b);
+    return b;
+}
+
+struct node* right_rotate ( node* a) {
+    node* b = a->left;
+    a->left = b->right;
+    b->right = a;
+    nodes_h_calc(a);
+    nodes_h_calc(b);
+    return b;
+}
+
+struct node* balance ( node* nodes) {
+    nodes_h_calc(nodes);
+    if (diff(nodes) == -2) {
+        if (diff(nodes->right) > 0)
+            nodes->right = right_rotate(nodes->right);
+        return left_rotate(nodes);
+    }
+    if (diff(nodes) == 2) {
+        if (diff(nodes->left) < 0)
+            nodes->left = left_rotate(nodes->left);
+        return right_rotate(nodes);
+    }
+    return nodes;
+}
+
+struct node* add_vertex ( node* cur_node, int val) {
+    if (cur_node == NULL) {
+        node* nodes = malloc(sizeof(node));
+        if (nodes == NULL)
+            return NULL;
+        nodes_initiate(nodes, val);
+        return nodes;
+    }
+    if (val > cur_node->val) {
+        node* buf = add_vertex(cur_node->right, val);
+        if (buf == NULL)
+            return NULL;
+        else
+            cur_node->right = buf;
+    }
+    else {
+        node* buf = add_vertex(cur_node->left, val);
+        if (buf == NULL)
+            return NULL;
+        else
+            cur_node->left = buf;
+    }
+    return balance(cur_node);
+}
+
+int insert ( node** cur_node, int val) {
+    node *nodes = add_vertex(*cur_node, val);
+    if (nodes == NULL)
+        return 0;
+    *cur_node = nodes;
+    return 1;
+}
+
+int scan_insert_node( node** nodes, int quantity, int f_vert) {
+    int i, key;
+    nodes_initiate(*nodes, f_vert);
+    for ( i = 0; i + 1 < quantity; ++i) {
+        if (scanf("%d", &key) != 1) {
+            free_nodes(*nodes);
+            return 0;
+        }
+        if (insert(nodes, key) == 0) {
+            free_nodes(*nodes);
+            return 0;
+        }
+    }
+    return 1;
+}
+
+int main() {
+    int quantity, f_vert;
+    node* nodes = malloc(sizeof(node));
+    if (nodes == NULL) return 0;
+    if (scanf("%d", &quantity)) {};
+    if(quantity == 0){
+        printf("0\n");
+        exit(0);
+    } else if (quantity < 0){
+        free(nodes);
+        return 0;
+    }
+    if (scanf("%d", &f_vert)) {}
+    if (scan_insert_node(&nodes, quantity, f_vert) == 0) return 0;
+    if (printf("%d\n", NODE_HEIGHT((nodes))) < 0) {
+        free_nodes(nodes);
+        return 0;
+    }
+    free_nodes(nodes);
+    return 1;
+}
