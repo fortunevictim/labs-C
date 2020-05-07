@@ -1,0 +1,124 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <limits.h>
+#define MAX_NODES 5000
+
+void freemem(void * graph, void * priorityQueue , void * edges, void * vertex_from ){
+    free(graph);
+    free(priorityQueue);
+    free(edges);
+    free(vertex_from);
+}
+
+int badcheck(int N, int M){
+    if(N == 0 && M == 0) {
+        printf("%s", "no spanning tree");
+        return 0;
+    } else if(N == 1 && M == 0) {
+        printf("%s", "");
+        return 0;
+    }
+    if (!(0 <= N && N <= MAX_NODES)){
+        printf( "%s", "bad number of vertices");
+        return 0;
+    }
+    if (!(0 <= M && M <= (N) * (N + 1) / 2)){
+        printf( "%s", "bad number of edges");
+        return 0;
+    }
+    return 1;
+}
+
+int check_spanning_tree(int N, int M, int * edges){
+    if (N == 0) {
+        printf("no spanning tree");
+        return 0;
+    } else if (N == 1 && M == 0)
+        return 0;
+    for (int i = 0; i < N; i++) {
+        if (!edges[i]) {
+            printf("no spanning tree");
+            return 0;
+        }
+    }
+    return 1;
+}
+
+void Prima_alg(int N, long long * priorityQueue, int ** graph, int * vertex_from){
+    int cur = 0, index = -1;
+    for (int i = 0; i < N - 1; i++) {
+        for (int j = 0; j < N; j++) {
+            if (graph[cur][j] < priorityQueue[j] && graph[cur][j] != 0 && priorityQueue[j] != LLONG_MAX) {
+                priorityQueue[j] = graph[cur][j];
+                vertex_from[j] = cur;
+            }
+        }
+        priorityQueue[cur] = LLONG_MAX;
+        long long min = priorityQueue[0];
+        for (int j = 1; j < N; j++) {
+            if (priorityQueue[j] < min) {
+                min = priorityQueue[j];
+                index = j;
+            }
+        }
+        cur = index;
+        printf("%d %d\n", vertex_from[index] + 1, index + 1);
+    }
+}
+
+int main(){
+    int N,M, index_from, index_to, i = 0, j = 0;
+    long long weight;
+    if (scanf("%d%d", &N, &M) < 2){
+        return 0;
+    }
+    if (badcheck(N, M) == 0)
+        return 0;
+    int ** graph = (int **)calloc(N , sizeof(int*));
+    for (i = 0; i < N; i++)
+        graph[i] = (int*)calloc(N , sizeof(int));
+    int *  edges = (int*)calloc(N , sizeof(int));
+    for (i = 0; i < M; i++){
+        int right_input = scanf("%d%d%lli", &index_from, &index_to, &weight);
+        if (right_input < 3) {
+            printf("bad number of lines");
+            for ( j = 0; j < N; j++)
+                free(graph[j]);
+            freemem(graph, NULL, edges, NULL);
+            return 0;
+        }
+        if (index_from < 1 || index_to < 1 || index_from > N || index_to > N){
+            printf("bad vertex");
+            for ( j = 0; j < N; j++)
+                free(graph[j]);
+            freemem(graph, NULL, edges, NULL);
+            return 0;
+        }
+        if (weight < 0 || weight > INT_MAX){
+            printf("bad length");
+            for ( j = 0; j < N; j++)
+                free(graph[j]);
+            freemem(graph, NULL, edges, NULL);
+            return 0;
+        }
+        graph[index_from - 1][index_to - 1] = (int)weight;
+        graph[index_to - 1][index_from - 1] = (int)weight;
+        edges[index_from - 1] = 1;
+        edges[index_to - 1] = 1;
+    }
+    if (check_spanning_tree(N, M, edges) == 0) {
+        for ( j = 0; j < N; j++)
+            free(graph[j]);
+        freemem(graph, NULL, edges, NULL);
+        return 0;
+    }
+    long long* priorityQueue = (long long*)calloc(N, sizeof(long long));
+    for (i = 1; i < N; i++)
+        priorityQueue[i] = (long long)INT_MAX + 1;
+    int* vertex_from = (int*)calloc(N , sizeof(int));
+    Prima_alg(N, priorityQueue, graph, vertex_from);
+    for (j = 0; j < N; j++)
+        free(graph[j]);
+    freemem(graph, priorityQueue, edges, vertex_from);
+    return 0;
+}
