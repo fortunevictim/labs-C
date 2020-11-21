@@ -1,1 +1,280 @@
-...
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
+#define uchar unsigned char
+#define LENGTH 256
+
+typedef struct auxilary_str {
+    char bigbuffer[9];
+    int bbend,cnt;
+}auxst;
+
+auxst *initiateAux (auxst * aux){
+    memset(aux->bigbuffer, '0', sizeof(aux->bigbuffer));
+    aux->cnt = 0; aux->bbend = 0;
+   return aux;
+}
+typedef struct node {
+    struct node *left;
+    struct node *right;
+    struct node *parent;
+    bool active;
+    char character;
+    long count;
+}node;
+
+void FreeTree(node *root) {
+    if (root != NULL) {
+        FreeTree(root->right);
+        FreeTree(root->left);
+        free(root);
+    }
+}
+
+int InitiateTreeArray(node *treearr, int freq_table[]) {
+    int ends = 0;
+    for (short i = 0; i < LENGTH; i++) {
+        if (freq_table[i] != 0) {
+            treearr[ends].count = freq_table[i];
+            treearr[ends].character = (char)i;
+            treearr[ends].left = NULL;
+            treearr[ends].right = NULL;
+            treearr[ends].parent = NULL;
+            treearr[ends].active = 1;
+            ends++;
+        }
+    }
+    return ends;
+}
+
+void MakeTable(FILE *fin, int freq_table[]) {
+    memset(freq_table, 0, sizeof(int) * LENGTH);
+    uchar curr_char = 0;
+    while (!feof(fin)) {
+        if (fscanf(fin, "%c", &curr_char)){}
+        freq_table[curr_char]++;
+    }
+}
+
+void Encode(char character, char *buffer, node *treearr) {
+    int i = 0;
+    while (treearr[i].character != character)
+        i++;
+    node *ptr = &treearr[i];
+    int currpos = 0;
+    while (ptr->parent != NULL) {
+        if (ptr == ptr->parent->left) {
+            buffer[currpos] = '0';
+            currpos++;
+        }
+        if (ptr == ptr->parent->right) {
+            buffer[currpos] = '1';
+            currpos++;
+        }
+        ptr = ptr->parent;
+    }
+    buffer[currpos] = '\0';
+    for (int j = 0; j < currpos / 2; j++) {
+        char tmp;
+        tmp = buffer[j];
+        buffer[j] = buffer[currpos - 1 - j];
+        buffer[currpos - 1 - j] = tmp;
+    }
+}
+
+int FindMinElement(node *treearr, int end) {
+    int currmin = 0;
+    while (treearr[currmin].active == 0)
+        currmin++;
+    for (int i = 0; i < end; i++) {
+        if ((treearr[i].count < treearr[currmin].count) && treearr[i].active == 1)
+            currmin = i;
+    }
+    treearr[currmin].active = 0;
+    return currmin;
+}
+
+node *BuildTree(int freq_table[], auxst * aux) {
+    node * treearr = (struct node*)malloc(sizeof(node)*2*LENGTH);
+    aux->cnt = InitiateTreeArray(treearr, freq_table);
+    int end  = aux->cnt;
+    for (int i = 0; i < aux->cnt - 1; i++) {
+        int min1, min2;
+        min1 = FindMinElement(treearr, end);
+        min2 = FindMinElement(treearr, end);
+        treearr[min1].parent = &treearr[end];
+        treearr[min2].parent = &treearr[end];
+        treearr[end].left = &treearr[min1];
+        treearr[end].right = &treearr[min2];
+        treearr[end].parent = NULL;
+        treearr[end].count = treearr[min1].count + treearr[min2].count;
+        treearr[end].active = 1;
+        end++;
+    }
+    return treearr;
+}
+
+char zip(char buffer[]) {
+    uchar x = 0;
+    for (short i = 0; i < 8; i++) {
+        if (buffer[7 - i] == '1')
+            x++;
+        if (i < 7)
+            x = x << 1;
+    }
+    memset(buffer, '0', sizeof(char)*9);
+    return x;
+}
+
+void Submit(FILE* fout, char *buffer, auxst * aux) {
+    for (short i = 0; i < (short)strlen(buffer); i++) {
+        aux->bigbuffer[aux->bbend] = buffer[i];
+        aux->bbend++;
+        aux->bigbuffer[aux->bbend] = '\0';
+        if (aux->bbend == 8){
+            char zipped_byte = zip(aux->bigbuffer);
+            fputc(zipped_byte, fout);
+            aux->bbend = 0;
+        }
+    }
+}
+
+void Unzip(char symbol, char *buffer) {
+    uchar in = symbol;
+    for (short i = 0; i < 8; i++){
+        uchar tmp = in % 2;
+        if (tmp == 0) buffer[i] = '0';
+        if (tmp == 1) buffer[i] = '1';
+        in = in / 2;
+    }
+    buffer[8] = '\0';
+}
+
+char FetchOne(FILE* fout, auxst *aux) {
+    char tmp;
+    if (aux->bbend >= 8) {
+        if (fread(&tmp, sizeof(char), 1, fout)){}
+        Unzip(tmp, aux->bigbuffer);
+        aux->bbend = 0;
+    }
+    return aux->bigbuffer[aux->bbend++];
+}
+
+void Fetch(int bits_count, char* buf, FILE *fout, auxst *aux) {
+    for (int i = 0; i < bits_count; i++)
+        buf[i] = FetchOne(fout, aux);
+    buf[bits_count] = '\0';
+}
+
+node* UnzipTree(FILE* fout, auxst *aux) {
+    if (FetchOne(fout, aux) == '0') {
+        node *node = (struct node*)calloc(sizeof(struct node), 1);
+        node->left = UnzipTree(fout, aux);
+        node->right = UnzipTree(fout, aux);
+        return node;
+    }
+    else {
+        char buf[9];
+        Fetch(8, buf, fout, aux);
+        node *leaf = (struct node*)calloc(sizeof(struct node), 1);
+        leaf->character = zip(buf);
+        leaf->left = NULL;
+        leaf->right = NULL;
+        return leaf;
+    }
+}
+
+char Decode(FILE *fout, node *root, auxst *aux) {
+    while (root->left != NULL) {
+        if (FetchOne(fout, aux) != '0') root = root->right;
+        else root = root->left;
+    }
+    return root->character;
+}
+
+int Decompress(FILE *fout, FILE *unfout, auxst * aux) {
+    if (fout == NULL)
+        return 1;
+    int datasize;
+    if (fread(&datasize, sizeof(int), 1, fout)){}
+    aux->bbend = 8;
+    node *root = UnzipTree(fout, aux);
+    for (int i = 0; i < datasize; i++) {
+        char symbol = Decode(fout, root, aux);
+        fputc(symbol, unfout);
+    }
+    FreeTree(root);
+    return 0;
+}
+
+void zipTree(FILE* fout, node *treearr, node *n, auxst * aux) {
+    if (n->left != NULL) {
+        Submit(fout, "0", aux);
+        zipTree(fout, treearr, n->left, aux);
+    }
+    else {
+        char buffer[9];
+        Submit(fout, "1", aux);
+        Unzip(n->character, buffer);
+        Submit(fout, buffer,aux);
+    }
+    if (n->right != NULL)
+        zipTree(fout, treearr, n->right, aux);
+}
+
+int Compress(FILE *fin, FILE *fout, int actual_start,auxst *aux) {
+    int freq_table[LENGTH];
+    MakeTable(fin, freq_table);
+    node *treearr = BuildTree(freq_table, aux);
+    char *buffer = (char *)calloc(aux->cnt, 1);
+    fseek(fin, 0, SEEK_END);
+    int datasize = ftell(fin) - actual_start;
+    fwrite(&datasize, sizeof(int), 1, fout);
+    fseek(fin, actual_start, SEEK_SET);
+    zipTree(fout, treearr, &treearr[2*aux->cnt - 2], aux);
+    char character;
+    while (fscanf(fin, "%c", &character) > 0) {
+        Encode(character,buffer, treearr);
+        Submit(fout, buffer, aux);
+    }
+    free(buffer);
+    free(treearr);
+    if (aux->bbend != 0) {
+        uchar drop_byte = zip(aux->bigbuffer);
+        fwrite(&drop_byte, sizeof(char), 1, fout);
+    }
+    return 0;
+}
+
+int main() {
+    FILE *fin, *fout;
+    fin = fopen("in.txt", "rb");
+    if (fin == NULL)
+        return 0;
+    fout = fopen("out.txt", "wb");
+    if (fout == NULL) {
+        fclose(fin);
+        return 0;
+    }
+    int count = 1;
+    char direction, buf;
+    if (fscanf(fin, "%c", &direction)){}
+    if (fscanf(fin, "%c", &buf)){}
+    while (buf != '\n') {
+        count++;
+        if (fscanf(fin, "%c", &buf) == -1) break;
+    }
+    int actual_start = count + 1;
+    fseek(fin, actual_start, SEEK_SET);
+    auxst *aux = (auxst*)malloc(sizeof(auxst));
+    initiateAux(aux);
+    if (direction == 'c')
+        Compress(fin, fout, actual_start, aux);
+    else if(direction == 'd')
+        Decompress(fin, fout, aux);
+    free(aux);
+    fclose(fin);
+    fclose(fout);
+    return 0;
+}
